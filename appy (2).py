@@ -84,7 +84,7 @@ def load_bank_files(files):
     start = time.time()
     bank_dfs = []
     for file in files:
-        df = pd.read_excel(file, usecols=['P', 'Amount'], names=['P', 'Amount'], header=None, skiprows=15, usecols=[15, 3])
+        df = pd.read_excel(file, names=['P', 'Amount'], header=None, skiprows=15, usecols=[15, 3])
         df['P'] = df['P'].astype(str).str.strip()
         df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
         bank_dfs.append(df)
