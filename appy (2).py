@@ -3,7 +3,6 @@ import pandas as pd
 import io
 from openpyxl import Workbook
 import re
-import time
 
 st.set_page_config(layout="wide")
 st.markdown("""
@@ -72,29 +71,19 @@ st.title("Excel გენერატორი")
 report_file = st.file_uploader("ატვირთე ანგარიშფაქტურების ფაილი (report.xlsx)", type=["xlsx"])
 statement_files = st.file_uploader("ატვირთე საბანკო ამონაწერის ფაილები (statement.xlsx)", type=["xlsx"], accept_multiple_files=True)
 
-@st.cache_data
-def load_excel_file(file):
-    start = time.time()
-    df = pd.read_excel(file, usecols=['გამყიდველი', 'სერია №', 'ღირებულება დღგ და აქციზის ჩათვლით'])
-    st.write(f"ფაილის წაკითხვა: {time.time() - start} წამი")
-    return df
-
-@st.cache_data
-def load_bank_files(files):
-    start = time.time()
-    bank_dfs = []
-    for file in files:
-        df = pd.read_excel(file, names=['P', 'Amount'], header=None, skiprows=15, usecols=[15, 3])
-        df['P'] = df['P'].astype(str).str.strip()
-        df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
-        bank_dfs.append(df)
-    bank_df = pd.concat(bank_dfs, ignore_index=True) if bank_dfs else pd.DataFrame()
-    st.write(f"ბანკის ფაილების დამუშავება: {time.time() - start} წამი")
-    return bank_df
-
 if report_file and statement_files:
-    purchases_df = load_excel_file(report_file)
-    bank_df = load_bank_files(statement_files)
+    purchases_df = pd.read_excel(report_file, sheet_name='Grid')
+    
+    # Process multiple bank statement files
+    bank_dfs = []
+    for statement_file in statement_files:
+        df = pd.read_excel(statement_file)
+        df['P'] = df.iloc[:, 15].astype(str).str.strip()
+        df['Amount'] = pd.to_numeric(df.iloc[:, 3], errors='coerce').fillna(0)
+        bank_dfs.append(df)
+    
+    # Combine all bank statement DataFrames
+    bank_df = pd.concat(bank_dfs, ignore_index=True) if bank_dfs else pd.DataFrame()
 
     purchases_df['დასახელება'] = purchases_df['გამყიდველი'].astype(str).apply(lambda x: re.sub(r'^\(\d+\)\s*', '', x).strip())
     purchases_df['საიდენტიფიკაციო კოდი'] = purchases_df['გამყიდველი'].apply(lambda x: ''.join(re.findall(r'\d', str(x)))[:11])
@@ -164,7 +153,7 @@ if report_file and statement_files:
 
     else:
         selected_code = st.session_state['selected_company']
-        df_full = load_excel_file(report_file)
+        df_full = pd.read_excel(report_file, sheet_name='Grid')
         df_full['დასახელება'] = df_full['გამყიდველი'].astype(str).apply(lambda x: re.sub(r'^\(\d+\)\s*', '', x).strip())
         df_full['საიდენტიფიკაციო კოდი'] = df_full['გამყიდველი'].apply(lambda x: ''.join(re.findall(r'\d', str(x)))[:11])
         matching_df = df_full[df_full['საიდენტიფიკაციო კოდი'] == selected_code]
@@ -184,7 +173,7 @@ if report_file and statement_files:
                         search_url = f"https://www.google.com/search?q={search_term.replace(' ', '+')}"
                         st.markdown(f"[🌐 გადადი გუგლზე]({search_url})", unsafe_allow_html=True)
                     else:
-                        st.warning("გთხოვ ჩაწერე текста ძებნამდე.")
+                        st.warning("გთხოვ ჩაწერე ტექსტი ძებნამდე.")
 
             company_output = io.BytesIO()
             company_wb = Workbook()
