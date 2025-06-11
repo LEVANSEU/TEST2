@@ -85,10 +85,6 @@ if report_file and statement_files:
     # Combine all bank statement DataFrames
     bank_df = pd.concat(bank_dfs, ignore_index=True) if bank_dfs else pd.DataFrame()
 
-    # Calculate advance amounts from column A (index 1)
-    advance_df = purchases_df[purchases_df.iloc[:, 1].astype(str).str.contains("ავანსი", case=False, na=False)]
-    advance_sums = advance_df.groupby('საიდენტიფიკაციო კოდი')['ღირებულება დღგ და აქციზის ჩათვლით'].sum().to_dict()
-
     purchases_df['დასახელება'] = purchases_df['გამყიდველი'].astype(str).apply(lambda x: re.sub(r'^\(\d+\)\s*', '', x).strip())
     purchases_df['საიდენტიფიკაციო კოდი'] = purchases_df['გამყიდველი'].apply(lambda x: ''.join(re.findall(r'\d', str(x)))[:11])
 
@@ -96,7 +92,7 @@ if report_file and statement_files:
     wb.remove(wb.active)
 
     ws1 = wb.create_sheet(title="ანგარიშფაქტურები კომპანიით")
-    ws1.append(['დასახელება', 'საიდენტიფიკაციო კოდი', 'ანგარიშფაქტურების ჯამი', 'ავანსი', 'ჩარიცხული თანხა', 'სხვაობა'])
+    ws1.append(['დასახელება', 'საიდენტიფიკაციო კოდი', 'ანგარიშფაქტურების ჯამი', 'ჩარიცხული თანხა', 'სხვაობა'])
 
     company_summaries = []
 
@@ -106,11 +102,10 @@ if report_file and statement_files:
         company_invoice_sum = unique_invoices['ღირებულება დღგ და აქციზის ჩათვლით'].sum()
 
         paid_sum = bank_df[bank_df["P"] == str(company_id)]["Amount"].sum()
-        advance_amount = advance_sums.get(company_id, 0)  # Default to 0 if no advance found
-        difference = company_invoice_sum - paid_sum - advance_amount
+        difference = company_invoice_sum - paid_sum
 
-        ws1.append([company_name, company_id, company_invoice_sum, advance_amount, paid_sum, difference])
-        company_summaries.append((company_name, company_id, company_invoice_sum, advance_amount, paid_sum, difference))
+        ws1.append([company_name, company_id, company_invoice_sum, paid_sum, difference])
+        company_summaries.append((company_name, company_id, company_invoice_sum, paid_sum, difference))
 
     output = io.BytesIO()
     wb.save(output)
@@ -120,10 +115,10 @@ if report_file and statement_files:
         st.subheader("📋 კომპანიების ჩამონათვალი")
 
         search_code = st.text_input("🔎 ჩაწერე საიდენტიფიკაციო კოდი:", "")
-        sort_column = st.selectbox("📊 დალაგების ველი", ["ინვოისების ჯამი", "ავანსი", "ჩარიცხვა", "სხვაობა"])
+        sort_column = st.selectbox("📊 დალაგების ველი", ["ინვოისების ჯამი", "ჩარიცხვა", "სხვაობა"])
         sort_order = st.radio("⬆️⬇️ დალაგების ტიპი", ["ზრდადობით", "კლებადობით"], horizontal=True)
 
-        sort_index = {"ინვოისების ჯამი": 2, "ავანსი": 3, "ჩარიცხვა": 4, "სხვაობა": 5}[sort_column]
+        sort_index = {"ინვოისების ჯამი": 2, "ჩარიცხვა": 3, "სხვაობა": 4}[sort_column]
         reverse = sort_order == "კლებადობით"
 
         filtered_summaries = company_summaries
@@ -137,14 +132,13 @@ if report_file and statement_files:
             <div style='flex: 2;'>დასახელება</div>
             <div style='flex: 2;'>საიდენტიფიკაციო კოდი</div>
             <div style='flex: 1.5;'>ინვოისების ჯამი</div>
-            <div style='flex: 1.5;'>ავანსი</div>
             <div style='flex: 1.5;'>ჩარიცხვა</div>
             <div style='flex: 1.5;'>სხვაობა</div>
         </div>
         """, unsafe_allow_html=True)
 
-        for name, company_id, invoice_sum, advance_amount, paid_sum, difference in filtered_summaries:
-            col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1.5, 1.5, 1.5, 1.5])
+        for name, company_id, invoice_sum, paid_sum, difference in filtered_summaries:
+            col1, col2, col3, col4, col5 = st.columns([2, 2, 1.5, 1.5, 1.5])
             with col1:
                 st.markdown(name)
             with col2:
@@ -153,10 +147,8 @@ if report_file and statement_files:
             with col3:
                 st.markdown(f"<div class='number-cell'>{invoice_sum:,.2f}</div>", unsafe_allow_html=True)
             with col4:
-                st.markdown(f"<div class='number-cell'>{advance_amount:,.2f}</div>", unsafe_allow_html=True)
-            with col5:
                 st.markdown(f"<div class='number-cell'>{paid_sum:,.2f}</div>", unsafe_allow_html=True)
-            with col6:
+            with col5:
                 st.markdown(f"<div class='number-cell'>{difference:,.2f}</div>", unsafe_allow_html=True)
 
     else:
@@ -181,7 +173,7 @@ if report_file and statement_files:
                         search_url = f"https://www.google.com/search?q={search_term.replace(' ', '+')}"
                         st.markdown(f"[🌐 გადადი გუგლზე]({search_url})", unsafe_allow_html=True)
                     else:
-                        st.warning("გთხოვ ჩაწერე текста ძებნამდე.")
+                        st.warning("გთხოვ ჩაწერე ტექსტი ძებნამდე.")
 
             company_output = io.BytesIO()
             company_wb = Workbook()
@@ -203,4 +195,3 @@ if report_file and statement_files:
             st.warning("📭 ჩანაწერი ვერ მოიძებნა ამ კომპანიისთვის.")
 
         if st.button("⬅️ დაბრუნება სრულ სიაზე"):
-            del st.session_state['selected_company']
