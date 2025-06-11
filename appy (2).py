@@ -72,18 +72,23 @@ report_file = st.file_uploader("ატვირთე ანგარიშფ�
 statement_files = st.file_uploader("ატვირთე საბანკო ამონაწერის ფაილები (statement.xlsx)", type=["xlsx"], accept_multiple_files=True)
 
 if report_file and statement_files:
+    st.write(f"Uploaded report file: {report_file.name}")
     purchases_df = pd.read_excel(report_file, sheet_name='Grid')
-    
+    st.write("purchases_df head:", purchases_df.head())
+
     # Process multiple bank statement files
     bank_dfs = []
     for statement_file in statement_files:
+        st.write(f"Processing statement file: {statement_file.name}")
         df = pd.read_excel(statement_file)
+        st.write(f"Raw df head for {statement_file.name}:", df.head())
         df['P'] = df.iloc[:, 15].astype(str).str.strip()
         df['Amount'] = pd.to_numeric(df.iloc[:, 3], errors='coerce').fillna(0)
         bank_dfs.append(df)
     
     # Combine all bank statement DataFrames
     bank_df = pd.concat(bank_dfs, ignore_index=True) if bank_dfs else pd.DataFrame()
+    st.write("bank_df head:", bank_df.head())
 
     purchases_df['დასახელება'] = purchases_df['გამყიდველი'].astype(str).apply(lambda x: re.sub(r'^\(\d+\)\s*', '', x).strip())
     purchases_df['საიდენტიფიკაციო კოდი'] = purchases_df['გამყიდველი'].apply(lambda x: ''.join(re.findall(r'\d', str(x)))[:11])
@@ -115,10 +120,10 @@ if report_file and statement_files:
         st.subheader("📋 კომპანიების ჩამონათვალი")
 
         search_code = st.text_input("🔎 ჩაწერე საიდენტიფიკაციო კოდი:", "")
-        sort_column = st.selectbox("📊 დალაგების ველი", ["ინვოისების ჯამი", "ჩარიცხვა", "სხვაობა"])
+        sort_column = st.selectbox("📊 დალაგების ველი", ["ანგარიშფაქტურების ჯამი", "ჩარიცხვა", "სხვაობა"])
         sort_order = st.radio("⬆️⬇️ დალაგების ტიპი", ["ზრდადობით", "კლებადობით"], horizontal=True)
 
-        sort_index = {"ინვოისების ჯამი": 2, "ჩარიცხვა": 3, "სხვაობა": 4}[sort_column]
+        sort_index = {"ანგარიშფაქტურების ჯამი": 2, "ჩარიცხვა": 3, "სხვაობა": 4}[sort_column]
         reverse = sort_order == "კლებადობით"
 
         filtered_summaries = company_summaries
@@ -131,7 +136,7 @@ if report_file and statement_files:
         <div class='summary-header'>
             <div style='flex: 2;'>დასახელება</div>
             <div style='flex: 2;'>საიდენტიფიკაციო კოდი</div>
-            <div style='flex: 1.5;'>ინვოისების ჯამი</div>
+            <div style='flex: 1.5;'>ანგარიშფაქტურების ჯამი</div>
             <div style='flex: 1.5;'>ჩარიცხვა</div>
             <div style='flex: 1.5;'>სხვაობა</div>
         </div>
@@ -173,7 +178,7 @@ if report_file and statement_files:
                         search_url = f"https://www.google.com/search?q={search_term.replace(' ', '+')}"
                         st.markdown(f"[🌐 გადადი გუგლზე]({search_url})", unsafe_allow_html=True)
                     else:
-                        st.warning("გთხოვ ჩაწერე ტექსტი ძებნამდე.")
+                        st.warning("გთხოვ ჩაწერე текста ძებნამდე.")
 
             company_output = io.BytesIO()
             company_wb = Workbook()
@@ -195,3 +200,4 @@ if report_file and statement_files:
             st.warning("📭 ჩანაწერი ვერ მოიძებნა ამ კომპანიისთვის.")
 
         if st.button("⬅️ დაბრუნება სრულ სიაზე"):
+            del st.session_state['selected_company']
